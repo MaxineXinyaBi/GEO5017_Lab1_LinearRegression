@@ -22,7 +22,7 @@ def gradient_descent(start, gradient_func, learning_rate, max_iterations, thresh
         step_size = learning_rate * gradient_func(params)
         # if step size is too small, quit the function
         if np.all(np.abs(step_size) < threshold):
-            print(f"stop after {max_iterations} iterations, current parameters: {params}")
+            print(f"stop after {i} iterations, current parameters: {params}")
             break
         # calculate the new params
         params = params - step_size
