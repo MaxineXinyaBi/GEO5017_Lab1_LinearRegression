@@ -1,0 +1,169 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from Functions import compute_gradient, mse_loss, poly_model, gradient_descent
+
+
+
+time = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+x_data = np.array([2.0, 1.08, -0.83, -1.97, -1.31, 0.57])
+y_data = np.array([0.0, 1.68, 1.82, 0.28, -1.51, -1.91])
+z_data = np.array([1.0, 2.38, 2.49, 2.15, 2.59, 4.32])
+
+
+####################################
+# Q2-2b constant acceleration
+####################################
+w_init = np.zeros(3)
+alpha = 0.0001
+max_iter = 10000
+tol = 1e-8
+
+print("\nFitting x(t) with a 2nd-degree polynomial ...")
+w_final_x, loss_history_x = gradient_descent(time, x_data, w_init, alpha, max_iter, tol)
+print("\nFitting y(t) with a 2nd-degree polynomial ...")
+w_final_y, loss_history_y = gradient_descent(time, y_data, w_init, alpha, max_iter, tol)
+print("\nFitting z(t) with a 2nd-degree polynomial ...")
+w_final_z, loss_history_z = gradient_descent(time, z_data, w_init, alpha, max_iter, tol)
+
+print("\n[Training Done]")
+print("w_final_x =", w_final_x)
+print("MSE_x =", mse_loss(time, x_data, w_final_x))
+print("w_final_y =", w_final_y)
+print("MSE_y =", mse_loss(time, y_data, w_final_y))
+print("w_final_z =", w_final_z)
+print("MSE_z =", mse_loss(time, z_data, w_final_z))
+
+
+# loss curve
+plt.figure()
+plt.plot(loss_history_x, label='MSE X(t)')
+plt.xlabel('Iteration')
+plt.ylabel('MSE')
+plt.title('Loss Curve (X-dimension, constant acceleration)')
+plt.legend()
+plt.show()
+
+plt.figure()
+plt.plot(loss_history_y, label='MSE Z(t)')
+plt.xlabel('Iteration')
+plt.ylabel('MSE')
+plt.title('Loss Curve (X-dimension, constant acceleration)')
+plt.legend()
+plt.show()
+
+plt.figure()
+plt.plot(loss_history_z, label='MSE Z(t)')
+plt.xlabel('Iteration')
+plt.ylabel('MSE')
+plt.title('Loss Curve (X-dimension, constant acceleration)')
+plt.legend()
+plt.show()
+
+t_plot = np.linspace(time.min(), time.max(), 100)
+# x(t)
+x_fit = poly_model(t_plot, w_final_x)
+plt.figure()
+plt.scatter(time, x_data, label='x data', color='b')
+plt.plot(t_plot, x_fit, label='x fitted (2nd degree)', color='r')
+plt.xlabel('t')
+plt.ylabel('x(t)')
+plt.title('x(t) Fit (Constant Acceleration)')
+plt.legend()
+plt.show()
+
+# y(t)
+y_fit = poly_model(t_plot, w_final_y)
+plt.figure()
+plt.scatter(time, y_data, label='y data', color='g')
+plt.plot(t_plot, y_fit, label='y fitted (2nd degree)', color='r')
+plt.xlabel('t')
+plt.ylabel('y(t)')
+plt.title('y(t) Fit (Constant Acceleration)')
+plt.legend()
+plt.show()
+
+# z(t)
+z_fit = poly_model(t_plot, w_final_z)
+plt.figure()
+plt.scatter(time, z_data, label='z data', color='c')
+plt.plot(t_plot, z_fit, label='z fitted (2nd degree)', color='r')
+plt.xlabel('t')
+plt.ylabel('z(t)')
+plt.title('z(t) Fit (Constant Acceleration)')
+plt.legend()
+plt.show()
+
+# SSE
+x_pred = poly_model(time, w_final_x)
+y_pred = poly_model(time, w_final_y)
+z_pred = poly_model(time, w_final_z)
+
+sse_x = np.sum((x_data - x_pred)**2)
+sse_y = np.sum((y_data - y_pred)**2)
+sse_z = np.sum((z_data - z_pred)**2)
+sse_total = sse_x + sse_y + sse_z
+
+print(f"SSE_x = {sse_x:.6f}")
+print(f"SSE_y = {sse_y:.6f}")
+print(f"SSE_z = {sse_z:.6f}")
+print(f"Total SSE = {sse_total:.6f}")
+
+# visualize the 3d pred constant speed trajectory
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+
+ax.scatter(x_data, y_data, z_data, color='b', marker='o', label='Data')
+
+x_plot = poly_model(t_plot, w_final_x)
+y_plot = poly_model(t_plot, w_final_y)
+z_plot = poly_model(t_plot, w_final_z)
+ax.plot(x_plot, y_plot, z_plot, color='r', label='Fitted Curve (2nd degree)')
+
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
+ax.set_title("3D Polynomial Fit (Constant Acceleration)")
+ax.legend()
+plt.show()
+
+
+####################################
+####################################
+# Q2-2c next second
+####################################
+next_t = 7.0
+x_next = poly_model(next_t, w_final_x)
+y_next = poly_model(next_t, w_final_y)
+z_next = poly_model(next_t, w_final_z)
+
+print(f"Predicted position at t={next_t}:")
+print(f"  x(7) = {x_next:.4f}")
+print(f"  y(7) = {y_next:.4f}")
+print(f"  z(7) = {z_next:.4f}")
+
+
+
+t_plot = np.linspace(time.min(), next_t, 100)
+
+# fitting curve（x, y, z）
+x_plot = poly_model(t_plot, w_final_x)
+y_plot = poly_model(t_plot, w_final_y)
+z_plot = poly_model(t_plot, w_final_z)
+
+# visualize in 3d
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+
+ax.scatter(x_data, y_data, z_data, color='b', marker='o', label='Measured Data')
+ax.plot(x_plot, y_plot, z_plot, color='gray', linestyle='--', label='Fitted Curve')
+
+# point (t=7)
+ax.scatter([x_next], [y_next], [z_next], color='r', marker='^', s=100,
+           label=f'Predicted (t={int(next_t)})')
+
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
+ax.set_title("3D Trajectory with Constant Acceleration Model")
+ax.legend()
+plt.show()
