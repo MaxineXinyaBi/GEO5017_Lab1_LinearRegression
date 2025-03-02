@@ -1,0 +1,119 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from Functions import compute_gradient, mse_loss, poly_model, gradient_descent
+
+
+
+time = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+x_data = np.array([2.0, 1.08, -0.83, -1.97, -1.31, 0.57])
+y_data = np.array([0.0, 1.68, 1.82, 0.28, -1.51, -1.91])
+z_data = np.array([1.0, 2.38, 2.49, 2.15, 2.59, 4.32])
+
+# Q2-1 Plot the trajectory
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+
+ax.plot(x_data, y_data, z_data, marker='o', linestyle='-',
+        color='b', label='Tracker Trajectory')
+
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
+ax.set_title('3D Trajectory of the Drone Tracker')
+
+ax.legend()
+plt.show()
+
+
+# Q2-2a constant speed
+w_init = np.zeros(2)
+Tol = 1e-8
+alpha = 0.0001
+max_iter = 100000
+
+w_final_x, loss_history_x = gradient_descent(time, x_data, w_init, alpha, max_iter, Tol)
+w_final_y, loss_history_y = gradient_descent(time, y_data, w_init, alpha, max_iter, Tol)
+w_final_z, loss_history_z = gradient_descent(time, z_data, w_init, alpha, max_iter, Tol)
+
+print("\nTraining is over！")
+print("w_final_x:", w_final_x)
+print("final MSE_x =", mse_loss(time, x_data, w_final_x))
+print("w_final_y:", w_final_y)
+print("final MSE_y =", mse_loss(time, y_data, w_final_y))
+print("w_final_z:", w_final_z)
+print("final MSE_z =", mse_loss(time, z_data, w_final_z))
+
+# 1) the speed in x,y,z
+speed_x = w_final_x[1]
+speed_y = w_final_y[1]
+speed_z = w_final_z[1]
+print(f"\nConstant speed in x-dir = {speed_x:.6f}")
+print(f"Constant speed in y-dir = {speed_y:.6f}")
+print(f"Constant speed in z-dir = {speed_z:.6f}")
+
+t_plot = np.linspace(time.min(), time.max(), 100)
+
+# x(t)
+x_fit = poly_model(t_plot, w_final_x)
+plt.figure()
+plt.scatter(time, x_data, label='x data', color='b')
+plt.plot(t_plot, x_fit, label='x fitted', color='r')
+plt.title("x(t) fit (constant speed)")
+plt.xlabel("t")
+plt.ylabel("x(t)")
+plt.legend()
+plt.show()
+
+# y(t)
+y_fit = poly_model(t_plot, w_final_y)
+plt.figure()
+plt.scatter(time, y_data, label='y data', color='g')
+plt.plot(t_plot, y_fit, label='y fitted', color='r')
+plt.title("y(t) fit (constant speed)")
+plt.xlabel("t")
+plt.ylabel("y(t)")
+plt.legend()
+plt.show()
+
+# z(t)
+z_fit = poly_model(t_plot, w_final_z)
+plt.figure()
+plt.scatter(time, z_data, label='z data', color='c')
+plt.plot(t_plot, z_fit, label='z fitted', color='r')
+plt.title("z(t) fit (constant speed)")
+plt.xlabel("t")
+plt.ylabel("z(t)")
+plt.legend()
+plt.show()
+
+# sum of squares error
+x_pred = poly_model(time, w_final_x)
+y_pred = poly_model(time, w_final_y)
+z_pred = poly_model(time, w_final_z)
+
+sse_x = np.sum((x_data - x_pred)**2)
+sse_y = np.sum((y_data - y_pred)**2)
+sse_z = np.sum((z_data - z_pred)**2)
+sse_total = sse_x + sse_y + sse_z
+
+print(f"\nSSE in x-dir = {sse_x:.6f}")
+print(f"SSE in y-dir = {sse_y:.6f}")
+print(f"SSE in z-dir = {sse_z:.6f}")
+print(f"Total SSE = {sse_total:.6f}")
+
+# visualize the 3d pred constant speed trajectory
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(x_data, y_data, z_data, c='b', marker='o', label='Data')
+
+x_plot = poly_model(t_plot, w_final_x)
+y_plot = poly_model(t_plot, w_final_y)
+z_plot = poly_model(t_plot, w_final_z)
+ax.plot(x_plot, y_plot, z_plot, color='red', label='Fitted Curve')
+
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
+ax.legend()
+plt.title("3D Polynomial Regression Fit (constant speed)")
+plt.show()
