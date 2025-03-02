@@ -1,0 +1,80 @@
+import numpy as np
+
+
+
+def poly_model(t,w):
+    """
+    :param t:
+    :param w: parameter(list) of polynomial, w[0] is the constant, w[1] is t^1
+    :return: the value of the polynomial
+    """
+    powers = np.arange(len(w))
+    return np.sum([w[i]*(t**i) for i in powers], axis=0)
+
+
+def mse_loss(t, real_data, w):
+    """
+    :param t:
+    :param x: true value
+    :param w: parameters
+    :return: MSE loss
+    """
+    # compute the predicted value
+    pred = poly_model(t,w)
+
+    # compute the error
+    residual_error = real_data - pred
+
+    # MSE
+    mse = np.mean((residual_error**2))
+    return mse
+
+
+def compute_gradient(t, real_data, w):
+    pred = poly_model(t,w)
+    error = real_data - pred
+
+    # numbers of the sample
+    N = len(t)
+
+    # initial gradient
+    grad = np.zeros_like(w)
+    for i in range(len(w)):
+        grad[i] = -(2/N) * np.sum(error * (t ** i))
+
+    return grad
+
+
+def gradient_descent(t, x, w_init, alpha, max_iter, tol):
+    """
+    :param t:
+    :param x:
+    :param y:
+    :param z:
+    :param w_init: initial parameter
+    :param alpha: study rate
+    :param max_iter: maximum number of iterations
+    :return: final parameter w, the loss history
+    """
+    w = w_init.copy()
+    loss_history = []
+
+    for i in range(max_iter):
+        grad = compute_gradient(t, x, w)
+
+        if np.linalg.norm(grad) <= tol:
+            print(f"The gradient is small enough and iteration stop")
+            break
+
+        # update the params
+        w = w - alpha * grad
+
+        # compute the loss after this iteration
+        current_loss = mse_loss(t, x, w)
+        loss_history.append(current_loss)
+
+        # print the single iteration
+        if i % (max_iter / 10) == 0:
+            print(f"Iteration {i}, Current loss: {current_loss:.6f}, grad_norm = {np.linalg.norm(grad):.6f}")
+
+    return w, loss_history
