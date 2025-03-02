@@ -17,9 +17,10 @@ Report can be found at [HERE](https://www.overleaf.com/project/67bcbb4d0d034e9a0
 ### Dependence on External Libraries
 - matplotlib
 - numpy
+- csv
 
 ### The Path to Data
-aa
+The data of drone location is stored in metadata.csv
 
 ### Where to Find the Results
 aa
