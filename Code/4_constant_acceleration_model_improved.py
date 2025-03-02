@@ -7,15 +7,12 @@ from mpl_toolkits.mplot3d import Axes3D
 #  Model (Decaying Learning Rate)
 # -------------------------
 
-
 def poly2(t, a, b, c):
     return a + b * t + c * (t ** 2)
-
 
 def sse_loss(t_data, x_data, a, b, c):
     errors = x_data - poly2(t_data, a, b, c)
     return 0.5 * np.sum(errors ** 2)
-
 
 def grad_sse(t_data, x_data, a, b, c):
     errors = x_data - poly2(t_data, a, b, c)
@@ -64,8 +61,10 @@ def gradient_descent_poly2(t_data, x_data, lr, epochs, tolerance, a, b, c):
                 break
         else:
             lr = lr / 2
+            print("Changing epoch:", count)
+            print("New lr:", lr)
             a_cache, b_cache, c_cache = a_prev, b_prev, c_prev
-    print(f"Epoch: {epoch_val + 1}; Lr: {lr:.1e}")
+    print("Final iteration:", count)
     return a_cache, b_cache, c_cache, epoch_list, loss_list
 
 
@@ -88,15 +87,15 @@ if __name__ == "__main__":
     tolerance = 1e-6  # Min allowed step size (tunable)
     a, b, c = 0, 0, 0  # Initial polynomial parameters (tunable)
 
-    print("Fitting x(t):")
+    print("\nFitting x(t):")
     a_x, b_x, c_x, epochs_x, loss_x = gradient_descent_poly2(t_data, x_data, init_lr, max_epochs, tolerance, a, b, c)
     sse_x = sse_loss(t_data, x_data, a_x, b_x, c_x)
 
-    print("Fitting y(t):")
+    print("\nFitting y(t):")
     a_y, b_y, c_y, epochs_y, loss_y = gradient_descent_poly2(t_data, y_data, init_lr, max_epochs, tolerance, a, b, c)
     sse_y = sse_loss(t_data, y_data, a_y, b_y, c_y)
 
-    print("Fitting z(t):")
+    print("\nFitting z(t):")
     a_z, b_z, c_z, epochs_z, loss_z = gradient_descent_poly2(t_data, z_data, init_lr, max_epochs, tolerance, a, b, c)
     sse_z = sse_loss(t_data, z_data, a_z, b_z, c_z)
 

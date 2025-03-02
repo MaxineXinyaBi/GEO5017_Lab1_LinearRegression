@@ -1,8 +1,3 @@
-# -*- coding = utf-8 -*-
-# @Time : 2025/3/1 2:57 PM
-# @Author : 叶泓瑜
-# @File : 1_plot_trajectory.py
-# @Software : PyCharm
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
