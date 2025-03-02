@@ -1,129 +1,102 @@
-
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
+# -------------------------
+#  Model
+# -------------------------
 
-# -------------------------
-#  1) 定义模型和损失函数
-# -------------------------
+
 def poly2(t, a, b, c):
-    """
-    二次多项式模型: f(t) = a + b*t + c*t^2
-    """
     return a + b * t + c * (t ** 2)
 
 
 def sse_loss(t_data, x_data, a, b, c):
-    """
-    计算 Sum of Squared Errors 的一半:
-        SSE = 0.5 * sum( (x_i - f(t_i))^2 )
-    """
     errors = x_data - poly2(t_data, a, b, c)
     return 0.5 * np.sum(errors ** 2)
 
 
-# -------------------------
-#  2) 计算梯度
-# -------------------------
 def grad_sse(t_data, x_data, a, b, c):
-    """
-    计算对 (a, b, c) 的偏导数:
-        d(SSE)/da, d(SSE)/db, d(SSE)/dc
-    """
-    errors = x_data - poly2(t_data, a, b, c)  # 形状: (n,)
-    # SSE = 0.5 * sum(errors^2)，
-    # d(SSE)/da = - sum( errors * d(f)/da ) = -sum( errors * 1 )
-    # d(SSE)/db = - sum( errors * t )
-    # d(SSE)/dc = - sum( errors * t^2 )
-    d_a = - np.sum(errors)
-    d_b = - np.sum(errors * t_data)
-    d_c = - np.sum(errors * (t_data ** 2))
+    errors = x_data - poly2(t_data, a, b, c)
+    d_a = -np.sum(errors)
+    d_b = -np.sum(errors * t_data)
+    d_c = -np.sum(errors * (t_data ** 2))
     return d_a, d_b, d_c
 
 
-# -------------------------
-#  3) 梯度下降
-# -------------------------
-def gradient_descent_poly2(t_data, x_data, lr, epochs, verbose=True):
-    """
-    用梯度下降寻找 a, b, c 使 SSE 最小
-    t_data, x_data: 输入数据
-    lr: 学习率
-    epochs: 迭代次数
-    verbose: 是否打印训练过程
-    """
-    # 随机初始化 a, b, c
-    a = 0
-    b = 0
-    c = 0
+def gradient_descent_poly2(t_data, x_data, lr, epochs, tolerance, a, b, c):
+    a = a
+    b = b
+    c = c
 
-    # 记录损失随 epoch 的变化
     loss_list = []
     epoch_list = []
 
     for epoch in range(epochs + 1):
-        # 1. 计算当前的 SSE
         loss_val = sse_loss(t_data, x_data, a, b, c)
+        if loss_val >8:
+            break
         loss_list.append(loss_val)
         epoch_list.append(epoch)
 
-        # 每隔 200 个 epoch 打印一次信息
-        if verbose and (epoch % 200 == 0):
-            print(f"Epoch {epoch:4d} | SSE = {loss_val:.6f} | "
-                  f"a={a:.4f} b={b:.4f} c={c:.4f}")
-
-        # 2. 计算梯度
         d_a, d_b, d_c = grad_sse(t_data, x_data, a, b, c)
 
-        # 3. 参数更新 (梯度下降)
-        a = a - lr * d_a
-        b = b - lr * d_b
-        c = c - lr * d_c
+        step_a = lr * d_a
+        step_b = lr * d_b
+        step_c = lr * d_c
+        step_size = np.sqrt(step_a ** 2 + step_b ** 2 + step_c ** 2)
 
-    # 最终参数
+        if step_size < tolerance:
+            break
+
+        a = a - step_a
+        b = b - step_b
+        c = c - step_c
+
+    print(f"Stop at epoch {epoch}, step_size={step_size:.8f}")
     return a, b, c, epoch_list, loss_list
 
 
 # -------------------------
-#  演示：使用给定的 X_data
+#  Testing
 # -------------------------
+
+
 if __name__ == "__main__":
-    # 题目中的时间点和 X_data
-    t_data = np.array([1, 2, 3, 4, 5, 6], dtype=float)
-    x_data = np.array([2, 1.08, -0.83, -1.97, -1.31, 0.57], dtype=float)
 
-    # 调用梯度下降来拟合二次多项式
-    a_hat, b_hat, c_hat, ep, loss_list = gradient_descent_poly2(
-        t_data, x_data,
-        lr=0.0008,
-        epochs=100000,
-        verbose=True
-    )
+    file_path = "metadata.csv"
+    df = pd.read_csv(file_path)
+    x_data = np.array(df["x"], dtype=float)
+    t_data = np.arange(1, len(x_data) + 1, dtype=float)
+    print("x_data:", x_data)
+    print("t_data:", t_data)
 
-    print("\n===== 拟合结果 =====")
-    print(f"a = {a_hat:.6f}, b = {b_hat:.6f}, c = {c_hat:.6f}")
-    final_loss = sse_loss(t_data, x_data, a_hat, b_hat, c_hat)
-    print(f"Final SSE = {final_loss:.6f}")
+    lr_list = [0.0001, 0.0005, 0.0008, 0.000845895]  # Learning rate (tunable)
+    color_list = ['blue', 'orange', 'yellow', 'red']
 
-    # 画出损失随迭代变化
-    plt.figure(figsize=(10, 4))
-    plt.subplot(1, 2, 1)
-    plt.plot(ep, loss_list, label='SSE')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss (SSE)')
-    plt.title('Loss vs. Epoch')
-    plt.legend()
+    fig, ax = plt.subplots(figsize=(10, 5))
 
-    # 画出原始数据点 & 拟合曲线
-    plt.subplot(1, 2, 2)
-    plt.scatter(t_data, x_data, color='blue', label='data')
-    t_lin = np.linspace(min(t_data), max(t_data), 100)
-    x_fit = poly2(t_lin, a_hat, b_hat, c_hat)
-    plt.plot(t_lin, x_fit, color='red', label='fitted curve')
-    plt.xlabel('t')
-    plt.ylabel('x')
-    plt.title('Data & Fitted Polynomial')
-    plt.legend()
+    for i, lr in enumerate(lr_list):
+        print(f"\n==== Learning Rate: {lr:.2e} ====")
+        a_hat, b_hat, c_hat, ep, loss_list = gradient_descent_poly2(
+            t_data, x_data, lr,
+            epochs=60000,  # Max allowed iterations (tunable)
+            tolerance=1e-6,  # Min allowed step size (tunable)
+            a=0, b=0, c=0  # Initial polynomial parameters (tunable)
+        )
+
+        ax.plot(ep, loss_list,
+                label=f"lr={lr:.1e}",
+                color=color_list[i % len(color_list)])
+
+        final_loss = sse_loss(t_data, x_data, a_hat, b_hat, c_hat)
+        print(f"a = {a_hat:.6f}, b = {b_hat:.6f}, c = {c_hat:.6f}, "
+              f"Final SSE = {final_loss:.6f}")
+
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Loss (SSE)")
+    ax.set_title("SSE vs. Epoch for Different LRs")
+    ax.legend()
 
     plt.tight_layout()
     plt.show()

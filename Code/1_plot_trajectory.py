@@ -7,15 +7,13 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-import csv
+import pandas as pd
 
 
 filename = "metadata.csv"
-points = []
-with open(filename, "r", encoding="utf-8-sig") as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        points.append((float(row["x"]), float(row["y"]), float(row["z"])))
+df = pd.read_csv(filename)
+points = list(zip(df["x"].astype(float), df["y"].astype(float), df["z"].astype(float)))
+print(points)
 
 
 fig = plt.figure(figsize=(10, 6))
