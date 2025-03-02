@@ -19,7 +19,7 @@ Report can be found at [HERE](https://www.overleaf.com/project/67bcbb4d0d034e9a0
 - numpy
 
 ### The Path to Data
-The data of drone location is stored in metadata.csv
+aa
 
 ### Where to Find the Results
 aa
