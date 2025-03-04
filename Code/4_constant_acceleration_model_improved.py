@@ -1,7 +1,10 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+import torch
+import torch.optim as optim
+import argparse
+
 
 # -------------------------
 #  Model (Decaying Learning Rate)
@@ -72,8 +75,7 @@ def gradient_descent_poly2(t_data, x_data, lr, epochs, tolerance, a, b, c):
 #  Testing and Prediction
 # -------------------------
 
-
-if __name__ == "__main__":
+def main_Decaying_Learning_Rate():
     file_path = "metadata.csv"
     df = pd.read_csv(file_path)
     x_data = np.array(df["x"], dtype=float)
@@ -142,4 +144,205 @@ if __name__ == "__main__":
     ax.view_init(azim=30)
 
     plt.tight_layout()
+    plt.show()    plt.show()
+
+
+
+# -------------------------
+#  Improvement 2:
+#  Covariance optimization in three directions
+#  +
+#  Considering the angular velocity of constant acceleration
+# -------------------------
+
+# Covariance regularization term:
+# Make the covariance matrix of the predicted data close to the target covariance matrix
+def covariance_penalty(x_pred, y_pred, z_pred, cov_target):
+    data = torch.stack([x_pred, y_pred, z_pred], dim=0)
+    cov_est = torch.cov(data)
+    penalty = torch.sum((cov_est - cov_target) ** 2)
+    return penalty
+
+# Angular velocity regularization term:
+# Use the quadratic model of x,y to calculate the heading angle and finite difference angular velocity
+def angular_velocity_penalty_3d(t, params, omega_target=0.0, dt=1.0):
+    # Calculate the x, y, z components of velocity: dx/dt = b + 2*c*t
+    vx = params['b_x'] + 2 * params['c_x'] * t
+    vy = params['b_y'] + 2 * params['c_y'] * t
+    vz = params['b_z'] + 2 * params['c_z'] * t
+    # Combined into a velocity vector (N,3)
+    v = torch.stack([vx, vy, vz], dim=1)
+    norm = torch.norm(v, dim=1, keepdim=True) + 1e-6
+    v_norm = v / norm
+    # Calculate the dot product of normalized velocity vectors at adjacent times
+    dot_products = torch.sum(v_norm[1:] * v_norm[:-1], dim=1)
+    dot_products = torch.clamp(dot_products, -1.0, 1.0)
+    angles = torch.acos(dot_products)
+    angular_velocity = angles / dt
+    penalty = torch.sum((angular_velocity - omega_target) ** 2)
+    return penalty
+
+
+def main_cov_angle_reg():
+    """
+    Use adaptive regularization weights to simultaneously consider:
+    1) SSE fitting loss in three directions
+    2) Covariance regularization term
+    3) 3D angular velocity regularization term
+    4) Draw with the specified style after training
+    """
+    file_path = "metadata.csv"
+    df = pd.read_csv(file_path)
+    x_data_np = np.array(df["x"], dtype=float)
+    y_data_np = np.array(df["y"], dtype=float)
+    z_data_np = np.array(df["z"], dtype=float)
+    t_data_np = np.arange(1, len(x_data_np) + 1, dtype=float)
+
+    # Convert to torch tensor
+    t_data = torch.tensor(t_data_np, dtype=torch.float32)
+    x_data = torch.tensor(x_data_np, dtype=torch.float32)
+    y_data = torch.tensor(y_data_np, dtype=torch.float32)
+    z_data = torch.tensor(z_data_np, dtype=torch.float32)
+
+    # Model parameters (a, b, c) * 3 dimensions
+    params = {
+        'a_x': torch.tensor(0.0, requires_grad=True),
+        'b_x': torch.tensor(0.0, requires_grad=True),
+        'c_x': torch.tensor(0.0, requires_grad=True),
+        'a_y': torch.tensor(0.0, requires_grad=True),
+        'b_y': torch.tensor(0.0, requires_grad=True),
+        'c_y': torch.tensor(0.0, requires_grad=True),
+        'a_z': torch.tensor(0.0, requires_grad=True),
+        'b_z': torch.tensor(0.0, requires_grad=True),
+        'c_z': torch.tensor(0.0, requires_grad=True)
+    }
+
+    # Target covariance matrix:
+    # assuming that each dimension is independent,
+    # the variance of the original data forms a diagonal matrix
+    cov_target = torch.tensor([
+        [np.var(x_data_np), 0, 0],
+        [0, np.var(y_data_np), 0],
+        [0, 0, np.var(z_data_np)]
+    ], dtype=torch.float32)
+
+    # Optimizer
+    optimizer = optim.Adam(params.values(), lr=0.01)
+    num_epochs = 6000
+
+    # Initial regularization weight
+    lambda_cov = 0.0
+    lambda_ang = 0.0
+
+    # Target regularization ratio (relative to SSE)
+    target_ratio_cov = 0.1
+    target_ratio_ang = 0.1
+
+    # Learning rate used to update the regularization weights
+    reg_lr = 0.0001
+
+    for epoch in range(num_epochs):
+        optimizer.zero_grad()
+
+        # Computational model predictions
+        x_pred = poly2(t_data, params['a_x'], params['b_x'], params['c_x'])
+        y_pred = poly2(t_data, params['a_y'], params['b_y'], params['c_y'])
+        z_pred = poly2(t_data, params['a_z'], params['b_z'], params['c_z'])
+
+        sse_x = 0.5 * torch.sum((x_data - x_pred) ** 2)
+        sse_y = 0.5 * torch.sum((y_data - y_pred) ** 2)
+        sse_z = 0.5 * torch.sum((z_data - z_pred) ** 2)
+        sse_total = sse_x + sse_y + sse_z
+
+        # Covariance Regularization
+        pen_cov = covariance_penalty(x_pred, y_pred, z_pred, cov_target)
+
+        # Angular velocity regularity
+        pen_ang = angular_velocity_penalty_3d(t_data, params, omega_target=0.0, dt=1.0)
+
+        total_loss = sse_total + lambda_cov * pen_cov + lambda_ang * pen_ang
+
+        total_loss.backward()
+        optimizer.step()
+
+        # Adaptive update of regularization weights
+        ratio_cov = 0.01
+        ratio_ang = 0.01
+        if sse_total.item() > 1e-10:
+            ratio_cov = (pen_cov.item()) / (sse_total.item())
+            ratio_ang = (pen_ang.item()) / (sse_total.item())
+
+        # Adjust lambda based on differences
+        lambda_cov = lambda_cov * np.exp(reg_lr * (ratio_cov - target_ratio_cov))
+        lambda_ang = lambda_ang * np.exp(reg_lr * (ratio_ang - target_ratio_ang))
+
+        if epoch % 1000 == 0:
+            print(f"Epoch {epoch} | Loss={total_loss.item():.6f} | SSE={sse_total.item():.6f} "
+                  f"| Cov={pen_cov.item():.4f} (lambda={lambda_cov:.6f}, ratio={ratio_cov:.6f}) "
+                  f"| Ang={pen_ang.item():.4f} (lambda={lambda_ang:.6f}, ratio={ratio_ang:.6f})")
+
+    next_t = len(t_data_np) + 1
+    a_x, b_x, c_x = params['a_x'].item(), params['b_x'].item(), params['c_x'].item()
+    a_y, b_y, c_y = params['a_y'].item(), params['b_y'].item(), params['c_y'].item()
+    a_z, b_z, c_z = params['a_z'].item(), params['b_z'].item(), params['c_z'].item()
+
+    pred_x = poly2(next_t, a_x, b_x, c_x)
+    pred_y = poly2(next_t, a_y, b_y, c_y)
+    pred_z = poly2(next_t, a_z, b_z, c_z)
+
+    print("\nFitted function relationships:")
+    print(f"x(t) = {a_x:.6f} + {b_x:.6f} * t + {c_x:.6f} * t^2")
+    print(f"y(t) = {a_y:.6f} + {b_y:.6f} * t + {c_y:.6f} * t^2")
+    print(f"z(t) = {a_z:.6f} + {b_z:.6f} * t + {c_z:.6f} * t^2")
+    print(f"SSE_total = {sse_total.item():.6f}")
+
+    print(f"\nPrediction for t = {next_t}:")
+    print(f"Predicted position: x = {pred_x:.6f}, y = {pred_y:.6f}, z = {pred_z:.6f}")
+
+    # -------------------------
+    #  3D Plot
+    # -------------------------
+    fig = plt.figure(figsize=(10, 6))
+    ax = fig.add_subplot(projection='3d')
+
+    ax.scatter(x_data_np, y_data_np, z_data_np, c='red', marker='o', label='Drone location')
+    ax.plot(x_data_np, y_data_np, z_data_np, linestyle='--', color='black', label='Flight path')
+
+    t_markers = np.arange(1, next_t + 1)
+    x_markers = poly2(t_markers, a_x, b_x, c_x)
+    y_markers = poly2(t_markers, a_y, b_y, c_y)
+    z_markers = poly2(t_markers, a_z, b_z, c_z)
+    ax.scatter(x_markers, y_markers, z_markers, c='green', marker='o', label='Estimated location')
+
+    t_vals = np.linspace(1, next_t, 50)
+    x_vals = poly2(t_vals, a_x, b_x, c_x)
+    y_vals = poly2(t_vals, a_y, b_y, c_y)
+    z_vals = poly2(t_vals, a_z, b_z, c_z)
+    ax.plot(x_vals, y_vals, z_vals, c='green', label='Constant acceleration model')
+
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    ax.set_title('Constant Acceleration Model (Adaptive Reg)', fontsize=14)
+    ax.tick_params(axis='both', which='major', labelsize=8)
+    ax.legend(fontsize=6)
+    ax.view_init(azim=30)
+
+    plt.tight_layout()
     plt.show()
+
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Select main function to run.")
+    parser.add_argument("--mode", type=str, default="original",
+                        help="Mode to run: 'original' for original main, 'cov' for covariance and angular velocity validation.")
+    args = parser.parse_args()
+
+    if args.mode == "cov":
+        print("Running covariance and angular velocity regression main...")
+        main_cov_angle_reg()
+    else:
+        print("Running Decaying Learning Rate main...")
+        main_Decaying_Learning_Rate()
