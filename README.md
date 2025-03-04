@@ -2,7 +2,7 @@
 ### Group members:
 1. Hongyu Ye (6286240)
 2. Xinya Bi (6195350)
-3. Xu Wang ()
+3. Xu Wang (6235379)
 
 ### Report
 Report can be found at [HERE](https://www.overleaf.com/project/67bcbb4d0d034e9a0d4fc292)
