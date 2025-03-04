@@ -7,7 +7,8 @@ import argparse
 
 
 # -------------------------
-#  Model (Decaying Learning Rate)
+#  Improvement 1:
+#  Decaying Learning Rate
 # -------------------------
 
 def poly2(t, a, b, c):
@@ -23,7 +24,6 @@ def grad_sse(t_data, x_data, a, b, c):
     d_b = -np.sum(errors * t_data)
     d_c = -np.sum(errors * (t_data ** 2))
     return d_a, d_b, d_c
-
 
 def gradient_descent_poly2(t_data, x_data, lr, epochs, tolerance, a, b, c):
     a_cache, b_cache, c_cache = a, b, c
@@ -70,10 +70,8 @@ def gradient_descent_poly2(t_data, x_data, lr, epochs, tolerance, a, b, c):
     print("Final iteration:", count)
     return a_cache, b_cache, c_cache, epoch_list, loss_list
 
+# -----------------------------
 
-# -------------------------
-#  Testing and Prediction
-# -------------------------
 
 def main_Decaying_Learning_Rate():
     file_path = "metadata.csv"
@@ -101,10 +99,14 @@ def main_Decaying_Learning_Rate():
     a_z, b_z, c_z, epochs_z, loss_z = gradient_descent_poly2(t_data, z_data, init_lr, max_epochs, tolerance, a, b, c)
     sse_z = sse_loss(t_data, z_data, a_z, b_z, c_z)
 
+    # NEW: 计算总SSE
+    total_SSE = sse_x + sse_y + sse_z
+
     print("\nFitted function relationships:")
     print(f"x(t) = {a_x:.6f} + {b_x:.6f} * t + {c_x:.6f} * t^2, SSE_x = {sse_x:.6f}")
     print(f"y(t) = {a_y:.6f} + {b_y:.6f} * t + {c_y:.6f} * t^2, SSE_y = {sse_y:.6f}")
     print(f"z(t) = {a_z:.6f} + {b_z:.6f} * t + {c_z:.6f} * t^2, SSE_z = {sse_z:.6f}")
+    print(f"Total SSE = {total_SSE:.6f}")  # NEW: 打印总SSE
 
     next_t = len(t_data) + 1
     pred_x = poly2(next_t, a_x, b_x, c_x)
@@ -144,9 +146,7 @@ def main_Decaying_Learning_Rate():
     ax.view_init(azim=30)
 
     plt.tight_layout()
-    plt.show()    plt.show()
-
-
+    plt.show()
 
 # -------------------------
 #  Improvement 2:
@@ -155,26 +155,21 @@ def main_Decaying_Learning_Rate():
 #  Considering the angular velocity of constant acceleration
 # -------------------------
 
-# Covariance regularization term:
-# Make the covariance matrix of the predicted data close to the target covariance matrix
+
 def covariance_penalty(x_pred, y_pred, z_pred, cov_target):
     data = torch.stack([x_pred, y_pred, z_pred], dim=0)
     cov_est = torch.cov(data)
     penalty = torch.sum((cov_est - cov_target) ** 2)
     return penalty
 
-# Angular velocity regularization term:
-# Use the quadratic model of x,y to calculate the heading angle and finite difference angular velocity
+
 def angular_velocity_penalty_3d(t, params, omega_target=0.0, dt=1.0):
-    # Calculate the x, y, z components of velocity: dx/dt = b + 2*c*t
     vx = params['b_x'] + 2 * params['c_x'] * t
     vy = params['b_y'] + 2 * params['c_y'] * t
     vz = params['b_z'] + 2 * params['c_z'] * t
-    # Combined into a velocity vector (N,3)
     v = torch.stack([vx, vy, vz], dim=1)
     norm = torch.norm(v, dim=1, keepdim=True) + 1e-6
     v_norm = v / norm
-    # Calculate the dot product of normalized velocity vectors at adjacent times
     dot_products = torch.sum(v_norm[1:] * v_norm[:-1], dim=1)
     dot_products = torch.clamp(dot_products, -1.0, 1.0)
     angles = torch.acos(dot_products)
@@ -182,15 +177,10 @@ def angular_velocity_penalty_3d(t, params, omega_target=0.0, dt=1.0):
     penalty = torch.sum((angular_velocity - omega_target) ** 2)
     return penalty
 
+# -----------------------------
+
 
 def main_cov_angle_reg():
-    """
-    Use adaptive regularization weights to simultaneously consider:
-    1) SSE fitting loss in three directions
-    2) Covariance regularization term
-    3) 3D angular velocity regularization term
-    4) Draw with the specified style after training
-    """
     file_path = "metadata.csv"
     df = pd.read_csv(file_path)
     x_data_np = np.array(df["x"], dtype=float)
@@ -204,7 +194,6 @@ def main_cov_angle_reg():
     y_data = torch.tensor(y_data_np, dtype=torch.float32)
     z_data = torch.tensor(z_data_np, dtype=torch.float32)
 
-    # Model parameters (a, b, c) * 3 dimensions
     params = {
         'a_x': torch.tensor(0.0, requires_grad=True),
         'b_x': torch.tensor(0.0, requires_grad=True),
@@ -217,34 +206,26 @@ def main_cov_angle_reg():
         'c_z': torch.tensor(0.0, requires_grad=True)
     }
 
-    # Target covariance matrix:
-    # assuming that each dimension is independent,
-    # the variance of the original data forms a diagonal matrix
     cov_target = torch.tensor([
         [np.var(x_data_np), 0, 0],
         [0, np.var(y_data_np), 0],
         [0, 0, np.var(z_data_np)]
     ], dtype=torch.float32)
 
-    # Optimizer
     optimizer = optim.Adam(params.values(), lr=0.01)
     num_epochs = 6000
 
-    # Initial regularization weight
     lambda_cov = 0.0
     lambda_ang = 0.0
 
-    # Target regularization ratio (relative to SSE)
     target_ratio_cov = 0.1
     target_ratio_ang = 0.1
 
-    # Learning rate used to update the regularization weights
     reg_lr = 0.0001
 
     for epoch in range(num_epochs):
         optimizer.zero_grad()
 
-        # Computational model predictions
         x_pred = poly2(t_data, params['a_x'], params['b_x'], params['c_x'])
         y_pred = poly2(t_data, params['a_y'], params['b_y'], params['c_y'])
         z_pred = poly2(t_data, params['a_z'], params['b_z'], params['c_z'])
@@ -254,10 +235,8 @@ def main_cov_angle_reg():
         sse_z = 0.5 * torch.sum((z_data - z_pred) ** 2)
         sse_total = sse_x + sse_y + sse_z
 
-        # Covariance Regularization
         pen_cov = covariance_penalty(x_pred, y_pred, z_pred, cov_target)
 
-        # Angular velocity regularity
         pen_ang = angular_velocity_penalty_3d(t_data, params, omega_target=0.0, dt=1.0)
 
         total_loss = sse_total + lambda_cov * pen_cov + lambda_ang * pen_ang
@@ -265,14 +244,12 @@ def main_cov_angle_reg():
         total_loss.backward()
         optimizer.step()
 
-        # Adaptive update of regularization weights
         ratio_cov = 0.01
         ratio_ang = 0.01
         if sse_total.item() > 1e-10:
             ratio_cov = (pen_cov.item()) / (sse_total.item())
             ratio_ang = (pen_ang.item()) / (sse_total.item())
 
-        # Adjust lambda based on differences
         lambda_cov = lambda_cov * np.exp(reg_lr * (ratio_cov - target_ratio_cov))
         lambda_ang = lambda_ang * np.exp(reg_lr * (ratio_ang - target_ratio_ang))
 
@@ -290,11 +267,19 @@ def main_cov_angle_reg():
     pred_y = poly2(next_t, a_y, b_y, c_y)
     pred_z = poly2(next_t, a_z, b_z, c_z)
 
+    # NEW: 分别计算各维度的 SSE
+    sse_x_val = 0.5 * torch.sum((x_data - poly2(t_data, params['a_x'], params['b_x'], params['c_x'])) ** 2).item()
+    sse_y_val = 0.5 * torch.sum((y_data - poly2(t_data, params['a_y'], params['b_y'], params['c_y'])) ** 2).item()
+    sse_z_val = 0.5 * torch.sum((z_data - poly2(t_data, params['a_z'], params['b_z'], params['c_z'])) ** 2).item()
+
     print("\nFitted function relationships:")
     print(f"x(t) = {a_x:.6f} + {b_x:.6f} * t + {c_x:.6f} * t^2")
     print(f"y(t) = {a_y:.6f} + {b_y:.6f} * t + {c_y:.6f} * t^2")
     print(f"z(t) = {a_z:.6f} + {b_z:.6f} * t + {c_z:.6f} * t^2")
-    print(f"SSE_total = {sse_total.item():.6f}")
+    print(f"SSE_x = {sse_x_val:.6f}")      # NEW: 打印x方向SSE
+    print(f"SSE_y = {sse_y_val:.6f}")      # NEW: 打印y方向SSE
+    print(f"SSE_z = {sse_z_val:.6f}")      # NEW: 打印z方向SSE
+    print(f"SSE_total = {sse_total.item():.6f}")  # NEW: 打印总SSE
 
     print(f"\nPrediction for t = {next_t}:")
     print(f"Predicted position: x = {pred_x:.6f}, y = {pred_y:.6f}, z = {pred_z:.6f}")
@@ -331,7 +316,7 @@ def main_cov_angle_reg():
     plt.tight_layout()
     plt.show()
 
-
+# -----------------------------
 
 
 if __name__ == "__main__":
